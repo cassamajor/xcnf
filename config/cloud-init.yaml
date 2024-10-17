@@ -1,0 +1,15 @@
+#cloud-config
+
+# Dependencies: https://ebpf-go.dev/guides/getting-started/
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - clang
+  - llvm
+  - libbpf-dev
+  - golang
+
+runcmd:
+  - ln -sf /usr/include/asm-generic/ /usr/include/asm
