@@ -126,3 +126,10 @@ func maint() {
 		}
 	}
 }
+
+func testing() (onInvestment string) {
+	mySkills := ""
+	companyTraits := ""
+
+	return mySkills + companyTraits
+}
