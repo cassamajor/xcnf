@@ -1,9 +1,3 @@
-To initalize the repository for the first time, run:
-```
-go mod init github.com/cassamajor/xcnf
-go mod tidy
-```
-
 # Setup eBPF Development Environment
 1. Download [OrbStack](https://orbstack.dev/download)
 2. Create an Ubuntu Virtual Machine named `ebpf`, and provide [`config/cloud-init.yaml`](/config/cloud-init.yaml) to automatically install dependencies
