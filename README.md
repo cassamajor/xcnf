@@ -19,7 +19,7 @@ For each example in the [examples](./examples/) directory:
 - The eBPF program, compiled bytecode, and required headers are located in the `bytecode` directory.
 - The eBPF application that runs in user space is located in the parent directory.
 
-To initalize the repository, run:
+To initalize the repository for the first time, run:
 ```
 go mod init github.com/cassamajor/xcnf
 go mod tidy
