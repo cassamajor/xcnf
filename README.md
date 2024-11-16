@@ -9,16 +9,15 @@
     orb
     ```
 4. View the [examples](./examples/) directory, which contains instructions on how to compile the eBPF program and run the eBPF application.
+    - The eBPF program, compiled bytecode, and required headers are located in the `bytecode` directory.
+    - The eBPF application that runs in user space is located in the parent directory.
 5. Teardown the Linux Virtual Machine
     ```shell
     orb delete ebpf
     ```
 
-## Repository Structure
-For each example in the [examples](./examples/) directory:
-- The eBPF program, compiled bytecode, and required headers are located in the `bytecode` directory.
-- The eBPF application that runs in user space is located in the parent directory.
 
+## Repository Init
 To initalize the repository for the first time, run:
 ```
 go mod init github.com/cassamajor/xcnf
