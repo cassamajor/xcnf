@@ -5,7 +5,7 @@
 
 int main(int argc, char **argv) {
     char path[128];
-    sprintf(path, "kill.o");
+    sprintf(path, "bytecode/kill.o");
 
     struct bpf_object *obj;
     struct bpf_link *link = NULL;
