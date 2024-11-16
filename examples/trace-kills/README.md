@@ -16,7 +16,7 @@ Run the eBPF application:
 sudo ./ebpf &
 ```
 
-Create a new `bash` process that we will kill, and observe the logged output:
+Create a new `bash` process in the background, kill the process, then observe the logged output:
 ```shell
 bash &
 pid2kill=$!
