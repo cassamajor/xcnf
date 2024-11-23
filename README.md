@@ -8,16 +8,10 @@
     ```shell
     orb
     ```
-4. Compile the eBPF bytecode and run the eBPF loader program
-   ```shell
-   go generate ./kernel
-   sudo go run main.go eth0
-   ```
+4. View the [examples](./examples/) directory, which contains instructions on how to compile the eBPF program and run the eBPF application.
+    - The eBPF program, compiled bytecode, and required headers are located in the `bytecode` directory.
+    - The eBPF application that runs in user space is located in the parent directory.
 5. Teardown the Linux Virtual Machine
     ```shell
     orb delete ebpf
     ```
-
-## Repository Structure
-- The eBPF program and compiled bytecode are in the [kernel](kernel) directory
-- Required headers exist in the [kernel/headers](/kernel/headers) directory
