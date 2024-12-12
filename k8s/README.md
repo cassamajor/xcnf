@@ -7,8 +7,8 @@ docker login ghcr.io -u cassamajor -p $(op read op://development/GitHub/credenti
 
 2. Build the image
 ```shell
-docker build --build-context rootDir=../examples/ip-counter/ -t ghcr.io/cassamajor/ebpf-ip-counter:v1
-# docker run ebpf-ip-counter
+docker build -t ghcr.io/cassamajor/ebpf-ip-counter:v1 --build-context dirpath=../examples/ip-counter/ .
+# docker run -it ghcr.io/cassamajor/ebpf-ip-counter:v1
 ```
 
 3. Push the image

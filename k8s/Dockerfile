@@ -4,6 +4,6 @@ FROM ubuntu:latest
 
 WORKDIR /app
 
-COPY * ./
+COPY --from=dirpath * ./
 
-CMD ["ip-counter"]
+# CMD ip-counter
