@@ -8,7 +8,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-    name: ip-counter
+      name: ip-counter
   template:
     metadata:
       labels:
@@ -18,17 +18,17 @@ spec:
     spec:
       containers:
       - name: unknown
-        image: ghcr.io/cassamajor/ebpf-ip-counter:v1
+        image: ghcr.io/cassamajor/ebpf-ip-counter:v3
         imagePullPolicy: Always
         securityContext:
-          capabilities:
-            add: ["BPF"]
-            # privileged: true
+          privileged: true
+          # capabilities:
+            # add: ["BPF"]
         volumeMounts:
         - name: debug
           mountPath: /sys/kernel/debug
       volumes:
         - name: debug
-        hostPath:
-          path: /sys/kernel/debug
-          type: Directory
+          hostPath:
+            path: /sys/kernel/debug
+            type: Directory
