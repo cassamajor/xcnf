@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu AS build
 
 WORKDIR /app
 
@@ -18,10 +18,10 @@ COPY --from=dirpath main.go ./
 RUN go generate ./bytecode
 RUN CGO_ENABLED=0 go build -o ./ip-counter
 
-FROM scratch
+FROM scratch AS final
 WORKDIR /app
-COPY --from=0 /app/bytecode/* ./bytecode/
-COPY --from=0 /app/ip-counter ./
+COPY --from=build /app/bytecode/* ./bytecode/
+COPY --from=build /app/ip-counter ./
 
 # execute when the container starts
 CMD [ "./ip-counter" ]
