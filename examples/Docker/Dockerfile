@@ -16,7 +16,12 @@ COPY --from=dirpath main.go ./
 
 # compile application
 RUN go generate ./bytecode
-RUN go build -o /ip-counter
-  
+RUN CGO_ENABLED=0 go build -o ./ip-counter
+
+FROM scratch
+WORKDIR /app
+COPY --from=0 /app/bytecode/* ./bytecode/
+COPY --from=0 /app/ip-counter ./
+
 # execute when the container starts
-CMD [ "/ip-counter" ]
+CMD [ "./ip-counter" ]
