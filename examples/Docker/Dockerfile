@@ -21,7 +21,7 @@ COPY --from=dirpath main.go ./
 
 # Compile the eBPF program into bytecode for multiple architectures
 RUN go generate ./bytecode
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o ./ip-counter
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o ./ip-counter
 
 # Copy the eBPF program and compiled bytecode from the build stage
 FROM scratch AS final
