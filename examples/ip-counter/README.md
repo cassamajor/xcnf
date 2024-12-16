@@ -11,4 +11,4 @@ go build -o ip-counter
 Run the eBPF application:
 ```
 sudo ./ip-counter
-```1
+```
