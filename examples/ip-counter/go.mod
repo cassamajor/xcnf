@@ -1,6 +1,6 @@
 module github.com/cassamajor/xcnf/examples/ipcounter
 
-go 1.22.2
+go 1.23.0
 
 require github.com/cilium/ebpf v0.16.0
 
