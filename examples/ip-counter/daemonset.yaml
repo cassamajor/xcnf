@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    name: ebpf-application
+  name: ebpf-application
+  namespace: ebpf
+spec:
+  selector:
+    matchLabels:
+      name: ip-counter
+  template:
+    metadata:
+      labels:
+        name: ip-counter
+      name: ip-counter
+      namespace: ebpf
+    spec:
+      containers:
+      - name: unknown
+        image: ghcr.io/cassamajor/ebpf-ip-counter:v3
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+          # capabilities:
+            # add: ["BPF"]
+        volumeMounts:
+        - name: debug
+          mountPath: /sys/kernel/debug
+      volumes:
+        - name: debug
+          hostPath:
+            path: /sys/kernel/debug
+            type: Directory
