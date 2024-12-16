@@ -9,7 +9,7 @@ import (
 
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
-	"github.com/cassamajor/xcnf/bytecode"
+	"github.com/cassamajor/xcnf/example/ipcounter/bytecode"
 )
 
 func main() {

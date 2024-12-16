@@ -1,4 +1,4 @@
-module github.com/cassamajor/xcnf
+module github.com/cassamajor/xcnf/example/ipcounter
 
 go 1.22.2
 

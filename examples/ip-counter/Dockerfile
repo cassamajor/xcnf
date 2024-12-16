@@ -1,23 +1,19 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=$BUILDPLATFORM ubuntu AS build
+FROM --platform=$BUILDPLATFORM ubuntu:latest AS build
 
 # Install tools required to compile the Restricted C eBPF program
 RUN apt-get update && apt-get install -y clang llvm libbpf-dev golang
 
 RUN ln -sf /usr/include/asm-generic/ /usr/include/asm
 
-# Copy the Go mod and Go sum files into WORKDIR
+# Copy eBPF program and application into WORKDIR
 WORKDIR /app
-COPY --from=dirpath go.mod ./
-COPY --from=dirpath go.sum ./
+COPY bytecode/gen.go bytecode/counter.c ./bytecode/
+COPY go.mod go.sum main.go ./
 
 # Download dependencies
 RUN go mod download
-
-# Copy eBPF program and application into WORKDIR
-COPY --from=dirpath bytecode/gen.go bytecode/counter.c ./bytecode/
-COPY --from=dirpath main.go ./
 
 # Compile the eBPF program into bytecode
 RUN go generate ./bytecode
@@ -34,3 +30,5 @@ COPY --from=build /app/ip-counter ./
 
 # Execute the eBPF program when the container starts
 CMD [ "./ip-counter" ]
+
+LABEL org.opencontainers.image.source=https://github.com/cassamajor/xcnf/example/ipcounter
