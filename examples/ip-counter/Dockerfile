@@ -31,4 +31,4 @@ COPY --from=build /app/ip-counter ./
 # Execute the eBPF program when the container starts
 CMD [ "./ip-counter" ]
 
-LABEL org.opencontainers.image.source=https://github.com/cassamajor/xcnf/example/ipcounter
+LABEL org.opencontainers.image.source=https://github.com/cassamajor/xcnf
