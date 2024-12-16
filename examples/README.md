@@ -5,9 +5,9 @@ Each example contains a Dockerfile that is capable of compiling the eBPF program
 
 ## Initialize the module
 ```shell
-go mod init github.com/cassamajor/xcnf
-go mod tidy
+go mod init github.com/cassamajor/xcnf/examples/ipcounter
 go get github.com/cilium/ebpf/cmd/bpf2go
+go mod tidy
 ```
 
 ## Compile the eBPF program

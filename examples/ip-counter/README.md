@@ -5,7 +5,7 @@ go generate ./bytecode
 
 Build the eBPF application:
 ```
-GOOS=linux GOARCH=amd64 go build
+go build -o ip-counter
 ```
 
 Run the eBPF application:
