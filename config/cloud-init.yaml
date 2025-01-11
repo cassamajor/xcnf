@@ -18,5 +18,3 @@ runcmd:
   - ln -sf /usr/include/aarch64-linux-gnu/bits/ /usr/include/bits
   - ln -sf /usr/include/aarch64-linux-gnu/sys/ /usr/include/sys
   - ln -sf /usr/include/aarch64-linux-gnu/gnu/ /usr/include/gnu
-
-#  The added `runcmd`s are due to headers not being in the PATH
