@@ -18,7 +18,7 @@ Test the eBPF program and application:
 sudo -E go test .
 ```
 
-Display the logs in a new terminal:
+Display the kernel trace logs in a new terminal:
 ```shell
 sudo tc exec bpf dbg
 ```
