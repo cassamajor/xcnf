@@ -1,6 +1,7 @@
 #cloud-config
 
 # Dependencies: https://ebpf-go.dev/guides/getting-started/
+# To find the location of a missing header, run: `find /usr -name libc-header-start.h`, where `libc-header-start.h` is replaced with the name of the missing header file.
 
 package_update: true
 package_upgrade: true
@@ -12,9 +13,9 @@ packages:
   - golang
 
 runcmd:
+# The symlinks below resolve missing header errors for `asm/types.h`
   - ln -sf /usr/include/asm-generic/ /usr/include/asm
 # The symlinks below resolve missing header errors for `stdint.h` and `stdlib.h` 
-# To find the location of a missing header, run: `find /usr -name libc-header-start.h`, where `libc-header-start.h` is replaced with the name of the missing header file.
   - ln -sf /usr/include/aarch64-linux-gnu/bits/ /usr/include/bits
   - ln -sf /usr/include/aarch64-linux-gnu/sys/ /usr/include/sys
   - ln -sf /usr/include/aarch64-linux-gnu/gnu/ /usr/include/gnu
