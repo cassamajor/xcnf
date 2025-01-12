@@ -4,12 +4,19 @@ import (
  "testing"
 
  "github.com/stretchr/testify/require"
+ "os"
+
 )
 
 func TestProbeLoad(t *testing.T) {
  _, err := loadObjects()
 
  require.NoError(t, err)
+}
+
+func TestMain(m *testing.M) {
+    exitCode := m.Run()
+    os.Exit(exitCode)
 }
 
 func TestPacket(t *testing.T) {
