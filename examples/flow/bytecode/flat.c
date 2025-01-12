@@ -1,5 +1,3 @@
-// go build: ignore
-
 #include <stdint.h>
 #include <stdlib.h>
 

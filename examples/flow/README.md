@@ -14,3 +14,6 @@ sudo ./flow
 ```
 
 Test the eBPF program and application:
+```
+sudo -E go test .
+```
