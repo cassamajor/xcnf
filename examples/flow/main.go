@@ -7,19 +7,17 @@ import (
 )
 
 func loadObjects() (*bytecode.ProbeObjects, error) {
- var objs bytecode.ProbeObjects
+	var objs bytecode.ProbeObjects
 
- if err := bytecode.LoadProbeObjects(&objs, nil); err != nil {
-  return nil, err
- }
+	if err := bytecode.LoadProbeObjects(&objs, nil); err != nil {
+		return nil, err
+	}
 
- return &objs, nil
+	return &objs, nil
 }
 
 func main() {
-var objs bytecode.ProbeObjects
-
- if err := bytecode.LoadProbeObjects(&objs, nil); err != nil {
-    log.Fatal("Loading eBPF objects:", err)
- }
+	if _, err := loadObjects(); err != nil {
+		log.Fatal("Loading eBPF objects:", err)
+	}
 }
