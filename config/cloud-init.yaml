@@ -1,7 +1,7 @@
 #cloud-config
 
 # Dependencies: https://ebpf-go.dev/guides/getting-started/
-# To find the location of a missing header, run: `find /usr -name libc-header-start.h`, where `libc-header-start.h` is replaced with the name of the missing header file.
+# To find the location of a missing header, run: `find /usr -name byteorder.h`, where `byteorder.h` is replaced with the name of the missing header file.
 
 package_update: true
 package_upgrade: true
@@ -14,7 +14,7 @@ packages:
 
 runcmd:
 # The symlinks below resolve missing header errors for `asm/types.h`
-  - ln -sf /usr/include/asm-generic/ /usr/include/asm
+  - ln -sf /usr/include/aarch64-linux-gnu/asm/ /usr/include/asm
 # The symlinks below resolve missing header errors for `stdint.h` and `stdlib.h` 
   - ln -sf /usr/include/aarch64-linux-gnu/bits/ /usr/include/bits
   - ln -sf /usr/include/aarch64-linux-gnu/sys/ /usr/include/sys
