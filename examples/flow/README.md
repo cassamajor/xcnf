@@ -22,3 +22,29 @@ Display the kernel trace logs in a new terminal:
 ```shell
 sudo tc exec bpf dbg
 ```
+
+---
+
+# Without userspace application
+
+Compile the eBPF program:
+```shell
+clang -target bpf -S -D __BPF_TRACING__ -Wall -Werror -O2 -emit-llvm -c -g flat.c
+llc -march=bpf -filetype=obj -o flat.o flat.ll
+```
+
+Add queueing discipline (qdisc):
+```shell
+sudo tc qdisc add dev lo clsact
+```
+
+Apply a BPF filter for ingress and egress traffic on the loopback interface
+```shell
+sudo tc filter add dev lo ingress bpf direct-action obj flat.o sec tc
+sudo tc filter add dev lo egress bpf direct-action obj flat.o sec tc
+```
+
+Display the kernel trace logs:
+```shell
+sudo tc exec bpf dbg
+```

@@ -79,12 +79,12 @@ int flat(struct __sk_buff* skb) {
         offset = sizeof(struct ethhdr) + sizeof(struct iphdr);
 
         if (head + offset > tail) {
-            return TC_ACT_OK
+            return TC_ACT_OK;
         }
 
         ip = head + sizeof(struct ethhdr);
 
-        if (ip->protocol != IP_PROTO_TCP && ip->protocol != IPPROTO_UDP) {
+        if (ip->protocol != IPPROTO_TCP && ip->protocol != IPPROTO_UDP) {
             return TC_ACT_OK;
         }
 
@@ -102,7 +102,7 @@ int flat(struct __sk_buff* skb) {
         break;
 
     case ETH_P_IPV6: /* IPv6 */
-        offset = sizeof(struct ethhdr) + sizeof(struct ipv6hdr)
+        offset = sizeof(struct ethhdr) + sizeof(struct ipv6hdr);
 
         if (head + offset > tail) {
             return TC_ACT_OK;
@@ -111,7 +111,7 @@ int flat(struct __sk_buff* skb) {
         ipv6 = (void*)head + sizeof(struct ethhdr);
 
         if (ipv6->nexthdr != IPPROTO_TCP || ipv6->nexthdr != IPPROTO_UDP) {
-            return TC_ACT_OK
+            return TC_ACT_OK;
         }
 
         pkt.src_ip = ipv6->saddr;
@@ -127,7 +127,7 @@ int flat(struct __sk_buff* skb) {
     }
 
     /* Conduct a bound check to ensure the packet is either TCP or UDP */
-    if (head + offset + sizeof*(struct tcphdr) > tail || head + offset + sizeof(udphdr) > tail) {
+    if (head + offset + sizeof(struct tcphdr) > tail || head + offset + sizeof(struct udphdr) > tail) {
         return TC_ACT_OK;
     }
 
@@ -166,6 +166,7 @@ int flat(struct __sk_buff* skb) {
     
     default: // We did not have a TCP or UDP segment
         return TC_ACT_OK;
+}
 
-    // return 0;
+    return 0;
 }
