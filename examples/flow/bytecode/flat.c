@@ -133,12 +133,39 @@ int flat(struct __sk_buff* skb) {
 
     /* Process TCP and UDP Segments*/
     switch (pkt.protocol) {
+    case IPPROTO_TCP:
+        tcp = head + offset;
 
-    }
+        if (tcp->syn) {
+            pkt.src_port = tcp->source;
+            pkt.dst_port = tcp->dest;
+            pkt.syn = tcp->syn;
+            pkt.ack = tcp->ack;
+            pkt.ts = bpf_ktime_get_ns(); // Time elapsed since system boot is used to accurately timestamp the packets in order
+
+            // Send the data to the user space program
+            if (bpf_ringbuf_output(&pipe, &pkt, sizeof(pkt), 0) < 0) {
+                return TC_ACT_OK;
+            }
+        }
+        break;
+
+    case IPPROTO_UDP:
+        udp = head + offset;
 
 
+        pkt.src_port = udp->source;
+        pkt.dst_port = udp->dest;
+        pkt.ts = bpf_ktime_get_ns(); // Time elapsed since system boot is used to accurately timestamp the packets in order
 
+        // Send the data to the user space program
+        if (bpf_ringbuf_output(&pipe, &pkt, sizeof(pkt), 0) < 0) {
+            return TC_ACT_OK;
+        }
+        break;
+    
+    default: // We did not have a TCP or UDP segment
+        return TC_ACT_OK;
 
-
-    return 0;
+    // return 0;
 }
