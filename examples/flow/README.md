@@ -44,7 +44,17 @@ sudo tc filter add dev lo ingress bpf direct-action obj flat.o sec tc
 sudo tc filter add dev lo egress bpf direct-action obj flat.o sec tc
 ```
 
-Display the kernel trace logs:
+Generate traffic:
+```shell
+ping 127.0.0.1
+```
+
+Display the kernel trace logs in a new terminal:
 ```shell
 sudo tc exec bpf dbg
+```
+
+Remove the qdisc and its filters:
+```shell
+sudo tc qdisc del dev lo clsact
 ```
