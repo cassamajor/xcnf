@@ -3,14 +3,14 @@
         {
             "name": "Mac",
             "includePath": [
-                "/Users/cassamajor/OrbStack/ebpf/usr/include", // Headers for eBPF
+                "/Users/cassamajor/OrbStack/ebpf/usr/include",
                 "${workspaceFolder}/**"
             ],
             "defines": [],
-            "compilerPath": "/opt/homebrew/Cellar/llvm/19.1.7/bin/clang",
+            "compilerPath": "/usr/bin/clang",
             "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "macos-clang-x64"
+            "intelliSenseMode": "macos-clang-arm64"
         }
     ],
     "version": 4
