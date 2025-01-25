@@ -1,7 +1,6 @@
 package flowtable
 
 import (
-	"hash"
 	"log"
 	"sync"
 	"time"
