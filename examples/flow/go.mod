@@ -4,7 +4,11 @@ go 1.23.0
 
 require github.com/stretchr/testify v1.10.0
 
-require github.com/vishvananda/netns v0.0.4 // indirect
+require (
+	github.com/gookit/color v1.5.4 // indirect
+	github.com/vishvananda/netns v0.0.4 // indirect
+	github.com/xo/terminfo v0.0.0-20210125001918-ca9a967f8778 // indirect
+)
 
 require (
 	github.com/cilium/ebpf v0.17.1
