@@ -1,4 +1,4 @@
-package probe
+package kprobe
 
 import (
 	"log"
@@ -80,3 +80,5 @@ func newProbe(iface netlink.Link) (*probe, error) {
 	return &hook, nil
 }
 
+// createQdisc creates the `clasact` qdisc
+func (p *probe)
