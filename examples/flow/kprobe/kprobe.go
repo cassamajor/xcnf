@@ -1,10 +1,14 @@
 package kprobe
 
 import (
+	"context"
 	"log"
 
 	"github.com/cassamajor/xcnf/examples/flow/bytecode"
 	"github.com/cassamajor/xcnf/examples/flow/clsact"
+	"github.com/cassamajor/xcnf/examples/flow/flowtable"
+	"github.com/cassamajor/xcnf/examples/flow/packet"
+	"github.com/cilium/ebpf/ringbuf"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -39,6 +43,7 @@ func (p *probe) loadObjects() error {
 	return nil
 }
 
+// setRlimit locks memory for resources to ensure our process has access to enough memory to be able to run.
 func setRlimit() error {
 	log.Println("Setting rlimit")
 
@@ -148,4 +153,99 @@ func (p *probe) addFilter(attrs netlink.FilterAttrs) {
 		Fd:           p.bpfObjects.ProbePrograms.Flat.FD(),
 		DirectAction: true,
 	})
+}
+
+func Run(ctx context.Context, iface netlink.Link) error {
+	log.Println("Starting up the probe")
+
+	// Lock memory for resources
+	if err := setRlimit(); err != nil {
+		log.Printf("Failed setting rlimit: %v", err)
+		return err
+	}
+
+	// Instantiate a new flow table and prune stale entries every 10 seconds
+	flowtable := flowtable.NewFlowTable()
+
+	go func() {
+		for range flowtable.Ticker.C {
+			flowtable.Prune()
+		}
+	}()
+
+	iface, err := netlink.LinkByName("eth0")
+
+	if err != nil {
+		return err
+	}
+
+	hook, err := newProbe(iface)
+
+	// Create a ring buffer reader from user space and pass it to the map object
+	pipe := hook.bpfObjects.ProbeMaps.Pipe
+
+	reader, err := ringbuf.NewReader(pipe)
+
+	if err != nil {
+		log.Println("Failed creating ringbuf reader")
+		return err
+	}
+
+	// Create a byte slice channel
+	c := make(chan []byte)
+
+	go func() {
+		for {
+			// Poll for events/data that is submitted via `bpf_ringbuf_output`
+			event, err := reader.Read()
+			if err != nil {
+				log.Printf("Failed rading from ringbuf: %v", err)
+				return
+			}
+			// Pass event to the channel when data is received
+			c <- event.RawSample
+		}
+	}()
+
+	for {
+		select {
+		// Clean up when the program is interrupted or terminated
+		case <-ctx.Done():
+			flowtable.Ticker.Stop()
+			return hook.bpfObjects.Close()
+
+		// Unmarshal, calculate, and display the latency of each flow
+		case pkt := <-c:
+			packetAttrs, ok := packet.UnmarshalBinary(pkt)
+			if !ok {
+				log.Printf("Cloud not unmarshall packet: %+v", pkt)
+				continue
+			}
+			packet.CalcLatency(packetAttrs, flowtable)
+		}
+	}
+
+	return nil
+}
+
+
+// Close will remove the qdisc, netlink handle, eBPF program, and eBPF maps when the program
+// gets interrupted (SIGINT) or terminated (SIGTERM)
+func (p *probe) Close() error {
+	log.Println("Removing qdisc")
+	if err := p.handle.QdiscDel(p.qdisc); err != nil {
+		log.Println("Failed to delete qdisc")
+		return err
+	}
+
+	log.Println("Deleting handle")
+	p.handle.Delete()
+
+	log.Println("Closing eBPF object")
+	if err := p.bpfObjects.Close(); err != nil {
+		log.Println("Fail to close the eBPF object")
+		return err
+	}
+
+	return nil
 }
