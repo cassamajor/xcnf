@@ -1,7 +1,7 @@
 //go:build ignore
 
 #include <linux/bpf.h>
-#include <bpf_helpers.h>
+#include <bpf/bpf_helpers.h>
 
 struct perf_trace_event {
     __u64 timestamp;
@@ -28,21 +28,21 @@ int xdp_dilih(struct xdp_md *ctx) {
     e.timestamp = bpf_ktime_get_ns();
     e.type = TYPE_ENTER;
     e.processing_time_ns = 0;
-    bpf_perf_Event_output(ctx, &output_map, BPF_F_CURRENT_CPU, &e, sizeof(e));
+    bpf_perf_event_output(ctx, &output_map, BPF_F_CURRENT_CPU, &e, sizeof(e));
 
     // Packet dropping logic
     if (bpf_get_prandom_u32() % 2 == 0) {
         // Perf event for dropping packet
-        e.TYPE = TYPE_DROP;
+        e.type = TYPE_DROP;
         __u64 ts = bpf_ktime_get_ns();
         e.processing_time_ns = ts - e.timestamp;
         e.timestamp = ts;
         bpf_perf_event_output(ctx, &output_map, BPF_F_CURRENT_CPU, &e, sizeof(e));
-        return XDP_DROP
+        return XDP_DROP;
     }
 
     // Perf event for passing packet
-    e.TYPE = TYPE_PASS;
+    e.type = TYPE_PASS;
     __u64 ts = bpf_ktime_get_ns();
     e.processing_time_ns = ts - e.timestamp;
     e.timestamp = ts;
