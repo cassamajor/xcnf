@@ -28,25 +28,25 @@ int xdp_dilih(struct xdp_md *ctx) {
     e.timestamp = bpf_ktime_get_ns();
     e.type = TYPE_ENTER;
     e.processing_time_ns = 0;
-    bpf_perf_event_output(ctx, &output_map, BPF_F_CURRENT_CPU, &e, sizeof(e));
+    bpf_perf_event_output(ctx, &output_map, BPF_F_CURRENT_CPU, &e, sizeof(e)); // Emit perf event
 
     // Packet dropping logic
     if (bpf_get_prandom_u32() % 2 == 0) {
         // Perf event for dropping packet
         e.type = TYPE_DROP;
         __u64 ts = bpf_ktime_get_ns();
-        e.processing_time_ns = ts - e.timestamp;
+        e.processing_time_ns = ts - e.timestamp; // Measure the processing time of dropped packets
         e.timestamp = ts;
-        bpf_perf_event_output(ctx, &output_map, BPF_F_CURRENT_CPU, &e, sizeof(e));
+        bpf_perf_event_output(ctx, &output_map, BPF_F_CURRENT_CPU, &e, sizeof(e)); // Emit perf event
         return XDP_DROP;
     }
 
     // Perf event for passing packet
     e.type = TYPE_PASS;
     __u64 ts = bpf_ktime_get_ns();
-    e.processing_time_ns = ts - e.timestamp;
+    e.processing_time_ns = ts - e.timestamp; // Measure the processing time of passed packets
     e.timestamp = ts;
-    bpf_perf_event_output(ctx, &output_map, BPF_F_CURRENT_CPU, &e, sizeof(e));
+    bpf_perf_event_output(ctx, &output_map, BPF_F_CURRENT_CPU, &e, sizeof(e)); // Emit perf event
 
     return XDP_PASS;
 }
