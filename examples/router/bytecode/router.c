@@ -2,9 +2,14 @@
 
 #include <linux/in.h>
 #include <linux/in6.h>
-
+#include <linux/ip.h>
+#include <linux/if_ether.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 #include <linux/bpf.h>
+
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
 
 struct perf_trace_event {
     __u64 timestamp;
@@ -34,7 +39,7 @@ struct {
 
 
 SEC("xdp") // Program hook point
-int xdp_dilih(struct xdp_md *ctx) {
+int xdp_capture(struct xdp_md *ctx) {
     struct packet pkt = {0};
 
     void *data_end = (void *)(long)ctx->data_end; // End of packet data
@@ -56,7 +61,7 @@ int xdp_dilih(struct xdp_md *ctx) {
         return XDP_DROP;
 
     // Place the source and destination IP of our packet into the last index of `in6_addr`
-    pkt.src_ip.in6_u.u6_addr32[3] = = ip->saddr;
+    pkt.src_ip.in6_u.u6_addr32[3] = ip->saddr;
     pkt.dst_ip.in6_u.u6_addr32[3] = ip->daddr;
     pkt.protocol = ip->protocol;  // Protocol (TCP/UDP/ICMP etc.)
 
@@ -74,7 +79,7 @@ int xdp_dilih(struct xdp_md *ctx) {
         pkt.dst_port = __bpf_ntohs(tcp->dest);
 
         bpf_printk("TCP Packet: Src IP: %u, Dst IP: %u, Src Port: %u, Dst Port: %u", 
-                   src_ip, dst_ip, src_port, dst_port);
+                   pkt.src_ip, pkt.dst_ip, pkt.src_port, pkt.dst_port);
     } else if (protocol == IPPROTO_UDP) {
         struct udphdr *udp = (struct udphdr *)(ip + 1);
         if ((void *)(udp + 1) > data_end)
@@ -84,7 +89,7 @@ int xdp_dilih(struct xdp_md *ctx) {
         pkt.dst_port = __bpf_ntohs(udp->dest);
 
         bpf_printk("UDP Packet: Src IP: %u, Dst IP: %u, Src Port: %u, Dst Port: %u", 
-                   src_ip, dst_ip, src_port, dst_port);
+                   pkt.src_ip, pkt.dst_ip, pkt.src_port, pkt.dst_port);
     }
 
     return XDP_PASS; // Let the packet continue
