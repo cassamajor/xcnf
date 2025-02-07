@@ -65,7 +65,7 @@ int xdp_capture(struct xdp_md *ctx) {
     pkt.dst_ip.in6_u.u6_addr32[3] = ip->daddr;
     pkt.protocol = ip->protocol;  // Protocol (TCP/UDP/ICMP etc.)
 
-    // Pad the 16 bites before IP address with all Fs as per the RFC
+    // Pad the 16 bytes before IP address with all Fs as per the RFC
     pkt.src_ip.in6_u.u6_addr32[5] = 0xffff;
     pkt.dst_ip.in6_u.u6_addr32[5] = 0xffff;
 
@@ -78,9 +78,9 @@ int xdp_capture(struct xdp_md *ctx) {
         pkt.src_port = __bpf_ntohs(tcp->source);
         pkt.dst_port = __bpf_ntohs(tcp->dest);
 
-        bpf_printk("TCP Packet: Src IP: %u, Dst IP: %u, Src Port: %u, Dst Port: %u", 
-                   pkt.src_ip, pkt.dst_ip, pkt.src_port, pkt.dst_port);
-    } else if (protocol == IPPROTO_UDP) {
+        bpf_printk("TCP Packet: Src IP: %pI4, Dst IP: %pI4, Src Port: %u, Dst Port: %u", 
+                   pkt.src_ip.in6_u.u6_addr32[3], pkt.dst_ip.in6_u.u6_addr32[3], pkt.src_port, pkt.dst_port);
+    } else if (pkt.protocol == IPPROTO_UDP) {
         struct udphdr *udp = (struct udphdr *)(ip + 1);
         if ((void *)(udp + 1) > data_end)
             return XDP_DROP;
@@ -88,8 +88,8 @@ int xdp_capture(struct xdp_md *ctx) {
         pkt.src_port = __bpf_ntohs(udp->source);
         pkt.dst_port = __bpf_ntohs(udp->dest);
 
-        bpf_printk("UDP Packet: Src IP: %u, Dst IP: %u, Src Port: %u, Dst Port: %u", 
-                   pkt.src_ip, pkt.dst_ip, pkt.src_port, pkt.dst_port);
+        bpf_printk("UDP Packet: Src IP: %pI4, Dst IP: %pI4, Src Port: %u, Dst Port: %u", 
+                   pkt.src_ip.in6_u.u6_addr32[3], pkt.dst_ip.in6_u.u6_addr32[3], pkt.src_port, pkt.dst_port);
     }
 
     return XDP_PASS; // Let the packet continue
