@@ -7,6 +7,8 @@ import (
 	"net"
 	"netkit/bytecode"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -85,7 +87,13 @@ func exist(ifIndex int){
 			panic(fmt.Errorf("could not attach peer prog %w", err))
 		}
 		defer peerLink.Close()
-}
+
+		// Forwarding is now enabled until exit
+		done := make(chan os.Signal, 1)
+		signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
+		fmt.Printf("%s is now forwarding IP packets until Ctrl+C is pressed.\n", os.Getenv("PRIMARY_INTERFACE"))
+		<-done
+	}
 
 func main() {
 	// selectInterface()
