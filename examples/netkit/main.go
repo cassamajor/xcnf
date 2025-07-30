@@ -5,7 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"netkit/bytecode"
 	"os"
+
+	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/link"
 )
 
 func resolveInterfaceByName(name string) (int, error) {
@@ -45,7 +49,46 @@ func selectInterface() {
 	fmt.Printf("Interface %s index is %d\n", *interfaceName, ifIndex)
 }
 
+func exist(ifIndex int){
+		// Load the programs into the Kernel
+		collSpec, err := bytecode.LoadNetkit()
+		if err != nil {
+			panic(fmt.Errorf("could not load collection spec: %w", err))
+		}
+	
+		coll, err := ebpf.NewCollection(collSpec)
+		if err != nil {
+			panic(fmt.Errorf("could not load BPF objects from collection spec: %w", err))
+		}
+		defer coll.Close()
+	
+		// Attach the program to the primary interface
+		primaryLink, err := link.AttachNetkit(link.NetkitOptions{
+			Program:   coll.Programs["netkit_primary"],
+			Interface: ifIndex,
+			Attach:    ebpf.AttachNetkitPrimary,
+		})
+	
+		if err != nil {
+			panic(fmt.Errorf("could not attach primary prog %w", err))
+		}
+		defer primaryLink.Close()
+	
+		// Attach the program to the peer, directly from the host, via the primary
+		peerLink, err := link.AttachNetkit(link.NetkitOptions{
+			Program:   coll.Programs["netkit_peer"],
+			Interface: ifIndex,
+			Attach:    ebpf.AttachNetkitPeer,
+		})
+	
+		if err != nil {
+			panic(fmt.Errorf("could not attach peer prog %w", err))
+		}
+		defer peerLink.Close()
+}
+
 func main() {
 	// selectInterface()
 	// displayInterfaces()
+	exist(11)
 }
