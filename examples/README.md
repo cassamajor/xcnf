@@ -53,3 +53,21 @@ docker run --privileged --pull=always -it ghcr.io/$USERNAME/$IMAGE_NAME:v1
 # 2024/12/12 20:57:31 Received 4 packets
 # ...
 ```
+
+
+
+---
+
+
+# Adding a new example
+```shell
+mkdir examples/$PROGRAM
+touch examples/$PROGRAM/main.go
+
+mkdir examples/$PROGRAM/bytecode
+touch examples/$PROGRAM/bytecode/gen.go
+touch examples/$PROGRAM/bytecode/netkit.c
+
+orb
+go generate ./bytecode
+```
