@@ -1,3 +1,5 @@
+> Although I've made a few optimizations, this code is largely adapted from https://github.com/pouriyajamshidi/flat
+
 Compile the eBPF program:
 ```shell
 go generate ./bytecode
