@@ -1,4 +1,3 @@
-
 //go:build ignore
 
 #include <linux/bpf.h>
