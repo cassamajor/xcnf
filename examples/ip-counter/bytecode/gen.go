@@ -1,3 +1,3 @@
 package bytecode
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go Counter counter.c
+//go:generate go tool bpf2go Counter counter.c

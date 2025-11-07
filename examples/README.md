@@ -14,7 +14,7 @@ export CR_PAT=YOUR_TOKEN
 ## Initialize the module
 ```shell
 go mod init github.com/cassamajor/xcnf/examples/$PROGRAM
-go get github.com/cilium/ebpf/cmd/bpf2go
+go get -tool github.com/cilium/ebpf/cmd/bpf2go
 go mod tidy
 ```
 
