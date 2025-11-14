@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/vishvananda/netlink"
 )
 
 func TestFunctionalOptions(t *testing.T) {
@@ -16,53 +17,43 @@ func TestFunctionalOptions(t *testing.T) {
 			name: "default config",
 			opts: []Option{},
 			validate: func(t *testing.T, cfg *config) {
-				assert.Equal(t, netkitL3, cfg.mode)
-				assert.True(t, cfg.scrubPrimary)
-				assert.True(t, cfg.scrubPeer)
-				assert.Equal(t, 0, cfg.headroom)
-				assert.Equal(t, 0, cfg.tailroom)
+				assert.Equal(t, netlink.NETKIT_MODE_L3, cfg.mode)
+				assert.Equal(t, netlink.NETKIT_SCRUB_NONE, cfg.scrubPrimary)
+				assert.Equal(t, netlink.NETKIT_SCRUB_NONE, cfg.scrubPeer)
 			},
 		},
 		{
 			name: "with L2 mode",
 			opts: []Option{WithL2Mode()},
 			validate: func(t *testing.T, cfg *config) {
-				assert.Equal(t, netkitL2, cfg.mode)
+				assert.Equal(t, netlink.NETKIT_MODE_L2, cfg.mode)
 			},
 		},
 		{
-			name: "with headroom",
-			opts: []Option{WithHeadroom(256)},
+			name: "with L3 mode explicit",
+			opts: []Option{WithL3Mode()},
 			validate: func(t *testing.T, cfg *config) {
-				assert.Equal(t, 256, cfg.headroom)
-			},
-		},
-		{
-			name: "with tailroom",
-			opts: []Option{WithTailroom(128)},
-			validate: func(t *testing.T, cfg *config) {
-				assert.Equal(t, 128, cfg.tailroom)
+				assert.Equal(t, netlink.NETKIT_MODE_L3, cfg.mode)
 			},
 		},
 		{
 			name: "disable scrubbing",
 			opts: []Option{WithNoScrub()},
 			validate: func(t *testing.T, cfg *config) {
-				assert.False(t, cfg.scrubPrimary)
-				assert.False(t, cfg.scrubPeer)
+				assert.Equal(t, netlink.NETKIT_SCRUB_NONE, cfg.scrubPrimary)
+				assert.Equal(t, netlink.NETKIT_SCRUB_NONE, cfg.scrubPeer)
 			},
 		},
 		{
 			name: "combined options",
 			opts: []Option{
 				WithL3Mode(),
-				WithHeadroom(256),
-				WithTailroom(128),
+				WithNoScrub(),
 			},
 			validate: func(t *testing.T, cfg *config) {
-				assert.Equal(t, netkitL3, cfg.mode)
-				assert.Equal(t, 256, cfg.headroom)
-				assert.Equal(t, 128, cfg.tailroom)
+				assert.Equal(t, netlink.NETKIT_MODE_L3, cfg.mode)
+				assert.Equal(t, netlink.NETKIT_SCRUB_NONE, cfg.scrubPrimary)
+				assert.Equal(t, netlink.NETKIT_SCRUB_NONE, cfg.scrubPeer)
 			},
 		},
 	}

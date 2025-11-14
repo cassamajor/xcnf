@@ -1,55 +1,38 @@
 package netkit
 
-const (
-	netkitL2 = 0
-	netkitL3 = 1
-)
+import "github.com/vishvananda/netlink"
 
 type config struct {
-	mode         int
-	headroom     int
-	tailroom     int
-	scrubPrimary bool
-	scrubPeer    bool
+	mode         netlink.NetkitMode
+	scrubPrimary netlink.NetkitScrub
+	scrubPeer    netlink.NetkitScrub
 }
 
 type Option func(*config)
 
 func defaultConfig() *config {
 	return &config{
-		mode:         netkitL3,
-		scrubPrimary: true,
-		scrubPeer:    true,
+		mode:         netlink.NETKIT_MODE_L3,
+		scrubPrimary: netlink.NETKIT_SCRUB_NONE,
+		scrubPeer:    netlink.NETKIT_SCRUB_NONE,
 	}
 }
 
 func WithL2Mode() Option {
 	return func(c *config) {
-		c.mode = netkitL2
+		c.mode = netlink.NETKIT_MODE_L2
 	}
 }
 
 func WithL3Mode() Option {
 	return func(c *config) {
-		c.mode = netkitL3
-	}
-}
-
-func WithHeadroom(bytes int) Option {
-	return func(c *config) {
-		c.headroom = bytes
-	}
-}
-
-func WithTailroom(bytes int) Option {
-	return func(c *config) {
-		c.tailroom = bytes
+		c.mode = netlink.NETKIT_MODE_L3
 	}
 }
 
 func WithNoScrub() Option {
 	return func(c *config) {
-		c.scrubPrimary = false
-		c.scrubPeer = false
+		c.scrubPrimary = netlink.NETKIT_SCRUB_NONE
+		c.scrubPeer = netlink.NETKIT_SCRUB_NONE
 	}
 }
