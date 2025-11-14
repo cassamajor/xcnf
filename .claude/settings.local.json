@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:code.claude.com)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(gh pr view:*)",
+      "mcp__context7__get-library-docs",
+      "Skill(superpowers:writing-plans)"
     ],
     "deny": [],
     "ask": []
