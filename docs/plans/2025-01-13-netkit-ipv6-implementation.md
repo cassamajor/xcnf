@@ -917,7 +917,7 @@ cd /workspace/examples/netkit-ipv6
 sudo ./netkit-ipv6 -name test_main
 
 # In another terminal, generate IPv6 traffic:
-ping6 -I test_mainp ff02::1
+ping6 ff02::1%test_mainp
 ```
 
 Expected: See IPv6 packet logs

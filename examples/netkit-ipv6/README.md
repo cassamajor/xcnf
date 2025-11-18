@@ -67,7 +67,7 @@ sudo ./netkit-ipv6
 sudo ./netkit-ipv6 -name mydev
 
 # In another terminal, generate IPv6 traffic:
-ping6 -I nk0p ff02::1  # Multicast to all nodes
+ping6 ff02::1%nk0p  # Multicast to all nodes
 ```
 
 ## Example Output
@@ -153,7 +153,7 @@ All resources are cleaned up via `defer` statements in reverse creation order:
 - Use: `orb` to enter OrbStack VM
 
 **No events logged**
-- Generate IPv6 traffic: `ping6 -I <interface>p ff02::1`
+- Generate IPv6 traffic: `ping6 ff02::1%<interface>p`
 - Check interface is up: `ip link show`
 
 **Warning: "source address might be selected on device other than"**

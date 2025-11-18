@@ -5,7 +5,9 @@
       "Bash(mkdir:*)",
       "Bash(gh pr view:*)",
       "mcp__context7__get-library-docs",
-      "Skill(superpowers:writing-plans)"
+      "Skill(superpowers:writing-plans)",
+      "Bash(go test:*)",
+      "Bash(go doc:*)"
     ],
     "deny": [],
     "ask": []
