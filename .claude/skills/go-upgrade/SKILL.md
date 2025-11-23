@@ -27,6 +27,7 @@ The skill updates these example projects:
 - `examples/flow/`
 - `examples/ip-counter/`
 - `examples/netkit/`
+- `examples/netkit-ipv6/`
 
 Note: `examples/trace-kills/` is skipped (no go.mod file)
 
@@ -69,6 +70,7 @@ Then for each example directory, use the **absolute path** to update the Go vers
 cd /absolute/path/to/xcnf/examples/flow && go mod edit -go=<VERSION> && go mod tidy
 cd /absolute/path/to/xcnf/examples/ip-counter && go mod edit -go=<VERSION> && go mod tidy
 cd /absolute/path/to/xcnf/examples/netkit && go mod edit -go=<VERSION> && go mod tidy
+cd /absolute/path/to/xcnf/examples/netkit-ipv6 && go mod edit -go=<VERSION> && go mod tidy
 ```
 
 Replace:
@@ -98,6 +100,7 @@ Updated go.mod files:
 ✓ examples/flow/go.mod
 ✓ examples/ip-counter/go.mod
 ✓ examples/netkit/go.mod
+✓ examples/netkit-ipv6/go.mod
 
 All dependencies tidied successfully.
 ```
@@ -158,6 +161,7 @@ REPO_ROOT=$(pwd)
 cd $REPO_ROOT/examples/flow && go mod edit -go=1.25.4 && go mod tidy
 cd $REPO_ROOT/examples/ip-counter && go mod edit -go=1.25.4 && go mod tidy
 cd $REPO_ROOT/examples/netkit && go mod edit -go=1.25.4 && go mod tidy
+cd $REPO_ROOT/examples/netkit-ipv6 && go mod edit -go=1.25.4 && go mod tidy
 ```
 
 This ensures each command starts from the correct location regardless of shell session.
@@ -169,6 +173,6 @@ This ensures each command starts from the correct location regardless of shell s
 **Assistant:**
 1. Runs `brew update && brew upgrade go`
 2. Detects new version: "1.25.2"
-3. Updates all three example go.mod files
+3. Updates all four example go.mod files
 4. Runs go mod tidy for each
 5. Displays summary of changes

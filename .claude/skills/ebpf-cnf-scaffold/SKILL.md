@@ -27,6 +27,8 @@ Creates a new eBPF CNF project with:
 
 ## Project Structure Created
 
+### Basic Structure
+
 ```
 examples/{name}/
 ├── main.go                 # Go userspace application
@@ -39,6 +41,51 @@ examples/{name}/
 ├── README.md              # Build and run instructions
 └── Dockerfile             # Optional containerization
 ```
+
+### With Internal Packages
+
+For complex CNFs, use subpackages to organize code:
+
+```
+examples/{name}/
+├── main.go                 # Entry point, CLI, event loop
+├── main_test.go           # Integration tests
+├── bytecode/
+│   ├── gen.go             # bpf2go generation
+│   ├── vmlinux.h          # Kernel types for CO-RE
+│   ├── {name}.c           # eBPF program
+│   ├── {name}_bpfel.go    # Generated
+│   └── {name}_bpfeb.go    # Generated
+├── {subpkg}/              # Internal package
+│   ├── {subpkg}.go        # Core functionality
+│   ├── {subpkg}_test.go   # Unit tests
+│   └── options.go         # Functional options
+├── go.mod
+└── README.md
+```
+
+Example from `netkit-ipv6`:
+```
+examples/netkit-ipv6/
+├── main.go
+├── main_test.go
+├── bytecode/
+│   ├── gen.go
+│   ├── vmlinux.h
+│   └── netkit_ipv6.c
+├── netkit/                 # Subpackage for device management
+│   ├── netkit.go          # CreatePair, Delete
+│   ├── netkit_test.go
+│   ├── options.go         # WithL2Mode, WithL3Mode
+│   └── ipv6.go            # ConfigureIPv6LinkLocal
+└── go.mod
+```
+
+Benefits of subpackages:
+- Separation of concerns (bytecode generation vs device management)
+- Reusable components
+- Independent unit testing
+- Clearer imports in main.go
 
 ## Information to Gather
 
@@ -210,17 +257,23 @@ After scaffolding, remind the user to:
    orb
    ```
 
-2. **Generate eBPF bytecode**:
+2. **Generate vmlinux.h** (for CO-RE programs):
+   ```shell
+   cd examples/{name}/bytecode
+   bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
+   ```
+
+3. **Generate eBPF bytecode**:
    ```shell
    cd examples/{name}
    go generate ./bytecode
    ```
 
-3. **Implement the CNF logic** in:
+4. **Implement the CNF logic** in:
    - `bytecode/{name}.c` - kernel-space processing
    - `main.go` - userspace control and data handling
 
-4. **Build and test**:
+5. **Build and test**:
    ```shell
    go build -o {name}
    sudo ./{name}

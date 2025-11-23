@@ -372,6 +372,8 @@ func main() {
 }
 ```
 
+**Tip:** When you create interfaces programmatically (e.g., `netkit.CreatePair`), use the returned index directly instead of looking up by name. See [EXAMPLES.md](EXAMPLES.md) for the pattern.
+
 ## kprobe/kretprobe Attachment
 
 ```go

@@ -11,6 +11,8 @@ This file contains complete, production-ready code examples demonstrating differ
    - [Database Connection (Uber Style)](#example-3-database-connection-interface-based)
 3. [Generic Interface Examples](#generic-interface-examples)
    - [Reusable Option Utilities](#example-4-generic-interface-based-options)
+4. [Simple Closure Examples](#simple-closure-examples)
+   - [Netkit Configuration](#example-5-netkit-configuration-simple-closure)
 
 ---
 
@@ -583,10 +585,138 @@ func TestGenericOptions(t *testing.T) {
 
 ---
 
+## Simple Closure Examples
+
+The following example uses the simplest form of functional options - closures without error returns.
+
+### Example 5: Netkit Configuration (Simple Closure)
+
+Configuration for netkit device pairs where options are simple mode/flag selections.
+
+**Why simple closures?**
+- Options are enum/flag selections that cannot fail
+- No validation needed during option application
+- Constructor handles validation after options applied
+- Cleaner API without unnecessary error handling
+
+```go
+package netkit
+
+import "github.com/vishvananda/netlink"
+
+type config struct {
+    mode         netlink.NetkitMode
+    scrubPrimary netlink.NetkitScrub
+    scrubPeer    netlink.NetkitScrub
+}
+
+// Option is a simple closure - no error return needed
+type Option func(*config)
+
+func defaultConfig() *config {
+    return &config{
+        mode:         netlink.NETKIT_MODE_L3,
+        scrubPrimary: netlink.NETKIT_SCRUB_NONE,
+        scrubPeer:    netlink.NETKIT_SCRUB_NONE,
+    }
+}
+
+func WithL2Mode() Option {
+    return func(c *config) {
+        c.mode = netlink.NETKIT_MODE_L2
+    }
+}
+
+func WithL3Mode() Option {
+    return func(c *config) {
+        c.mode = netlink.NETKIT_MODE_L3
+    }
+}
+
+func WithNoScrub() Option {
+    return func(c *config) {
+        c.scrubPrimary = netlink.NETKIT_SCRUB_NONE
+        c.scrubPeer = netlink.NETKIT_SCRUB_NONE
+    }
+}
+
+// CreatePair applies options then validates
+func CreatePair(name string, opts ...Option) (*Pair, error) {
+    if name == "" {
+        return nil, fmt.Errorf("netkit: device name cannot be empty")
+    }
+
+    cfg := defaultConfig()
+    for _, opt := range opts {
+        opt(cfg)  // No error check - options cannot fail
+    }
+
+    // Use cfg.mode, cfg.scrubPrimary, cfg.scrubPeer
+    // to configure the netkit device...
+
+    return pair, nil
+}
+```
+
+**Usage:**
+```go
+// Default L3 mode
+pair, err := netkit.CreatePair("nk0")
+
+// Explicit L3 mode with no scrubbing
+pair, err := netkit.CreatePair("nk0",
+    netkit.WithL3Mode(),
+    netkit.WithNoScrub(),
+)
+
+// L2 mode
+pair, err := netkit.CreatePair("nk0",
+    netkit.WithL2Mode(),
+)
+```
+
+**Testing:**
+```go
+func TestWithL3Mode(t *testing.T) {
+    t.Parallel()
+
+    cfg := defaultConfig()
+    WithL3Mode()(cfg)
+
+    if cfg.mode != netlink.NETKIT_MODE_L3 {
+        t.Errorf("expected L3 mode, got %v", cfg.mode)
+    }
+}
+
+func TestOptionsApplyInOrder(t *testing.T) {
+    t.Parallel()
+
+    cfg := defaultConfig()
+    WithL2Mode()(cfg)
+    WithL3Mode()(cfg)  // Should override L2
+
+    if cfg.mode != netlink.NETKIT_MODE_L3 {
+        t.Errorf("expected L3 mode after override, got %v", cfg.mode)
+    }
+}
+```
+
+**When to choose simple closures over error-returning:**
+
+| Simple Closures | Error-Returning Closures |
+|-----------------|--------------------------|
+| Enum/mode selection | File/network operations |
+| Boolean flags | Complex validation |
+| Pre-validated values | Dependent options |
+| Internal config | User-facing API with bad input |
+
+---
+
 ## Summary
 
 - **Closure-based**: Best for applications with error handling needs (Examples 1-2)
 - **Interface-based**: Best for libraries requiring testability (Example 3)
 - **Generic interface**: Best for reusable option utilities across types (Example 4)
+- **Simple closure**: Best for enum/flag configuration without validation (Example 5)
 
 Refer back to [SKILL.md](SKILL.md) for guidance on choosing between these approaches.

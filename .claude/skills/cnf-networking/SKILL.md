@@ -59,6 +59,10 @@ ip link set veth0 up
 ip netns exec test-ns ip link set veth1 up
 ```
 
+**Programmatic creation with Go:**
+
+For programmatic netkit creation using vishvananda/netlink (with proper error handling, cleanup, and functional options), see [EXAMPLES.md](EXAMPLES.md). The Go approach is preferred for production code and testing.
+
 **Attaching eBPF to netkit (Go):**
 ```go
 import (

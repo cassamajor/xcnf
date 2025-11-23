@@ -90,6 +90,10 @@ Naming conventions:
 - Always validate inputs and return errors for invalid configuration
 - Allow empty/nil inputs when appropriate (return nil error)
 
+### 4. Simple Closure Pattern (No Error Returns)
+
+When options are simple value assignments (enums, modes, flags) that cannot fail, use `type Option func(*config)` without error returns. The constructor handles validation after all options are applied. See [EXAMPLES.md](EXAMPLES.md) for the netkit configuration example.
+
 ## Usage Examples
 
 ### Basic Usage
