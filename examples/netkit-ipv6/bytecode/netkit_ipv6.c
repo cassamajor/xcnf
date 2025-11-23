@@ -1,12 +1,11 @@
 //go:build ignore
 
 #include "vmlinux.h"
+#include <linux/if_link.h> // NETKIT_*
+#include <linux/if_ether.h> // ETH_P_IPV6
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_core_read.h>
-
-#define ETH_P_IPV6 0x86DD
-#define NETKIT_PASS 0
 
 // Event structure sent to userspace
 struct ipv6_event {

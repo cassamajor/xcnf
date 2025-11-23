@@ -64,7 +64,7 @@ go build
 sudo ./netkit-ipv6
 
 # Specify custom device name
-sudo ./netkit-ipv6 -name mydev
+sudo ./netkit-ipv6 -name nk0
 
 # In another terminal, generate IPv6 traffic:
 ping6 ff02::1%nk0p  # Multicast to all nodes
