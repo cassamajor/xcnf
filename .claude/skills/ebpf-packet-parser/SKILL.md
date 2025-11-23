@@ -427,6 +427,99 @@ int xdp_parser(struct xdp_md *ctx) {
 4. **Use `__builtin_memset`** for structure initialization
 5. **Be careful with pointer arithmetic** - always check bounds after calculating offsets
 
+## CO-RE (Compile Once, Run Everywhere)
+
+For portable eBPF programs that work across kernel versions, use CO-RE with vmlinux.h:
+
+### Setup
+
+```c
+//go:build ignore
+
+#include "vmlinux.h"
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
+#include <bpf/bpf_core_read.h>
+
+#define ETH_P_IPV6 0x86DD
+```
+
+Generate vmlinux.h once:
+```bash
+bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
+```
+
+### Using BPF_CORE_READ
+
+For portable field access across kernel versions:
+
+```c
+// Direct access (works but not portable)
+event->next_header = ip6->nexthdr;
+
+// CO-RE portable access
+event->next_header = BPF_CORE_READ(ip6, nexthdr);
+event->payload_len = bpf_ntohs(BPF_CORE_READ(ip6, payload_len));
+event->hop_limit = BPF_CORE_READ(ip6, hop_limit);
+```
+
+### Complete CO-RE IPv6 Parser Example
+
+```c
+#include "vmlinux.h"
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
+#include <bpf/bpf_core_read.h>
+
+#define ETH_P_IPV6 0x86DD
+
+struct ipv6_event {
+    __u8 src_addr[16];
+    __u8 dst_addr[16];
+    __u8 next_header;
+    __u16 payload_len;
+    __u8 hop_limit;
+} __attribute__((packed));
+
+static __always_inline int parse_ipv6(struct __sk_buff *skb,
+                                       struct ipv6_event *event) {
+    void *data_end = (void *)(long)skb->data_end;
+    void *data = (void *)(long)skb->data;
+
+    struct ethhdr *eth = data;
+    if ((void *)(eth + 1) > data_end)
+        return -1;
+
+    if (eth->h_proto != bpf_htons(ETH_P_IPV6))
+        return -1;
+
+    struct ipv6hdr *ip6 = (void *)(eth + 1);
+    if ((void *)(ip6 + 1) > data_end)
+        return -1;
+
+    // Use __builtin_memcpy for address arrays
+    __builtin_memcpy(event->src_addr, &ip6->saddr, 16);
+    __builtin_memcpy(event->dst_addr, &ip6->daddr, 16);
+
+    // Use BPF_CORE_READ for portable field access
+    event->next_header = BPF_CORE_READ(ip6, nexthdr);
+    event->payload_len = bpf_ntohs(BPF_CORE_READ(ip6, payload_len));
+    event->hop_limit = BPF_CORE_READ(ip6, hop_limit);
+
+    return 0;
+}
+```
+
+**When to use CO-RE:**
+- Programs that must run on multiple kernel versions
+- Using kernel types that may change between versions
+- Production deployments across heterogeneous systems
+
+**When direct access is fine:**
+- Single kernel version deployment
+- Standard network headers (ethhdr, iphdr, ipv6hdr)
+- Development/testing on known kernel
+
 ## Common Pitfalls
 
 - Forgetting bounds checks (verifier will reject)

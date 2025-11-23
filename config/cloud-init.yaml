@@ -9,6 +9,7 @@ packages:
   - clang
   - llvm
   - libbpf-dev
+  - linux-tools-generic
   - golang
 
 runcmd:

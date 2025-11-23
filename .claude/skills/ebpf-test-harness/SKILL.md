@@ -94,6 +94,8 @@ func TestCNFBasic(t *testing.T) {
 }
 ```
 
+**Tip:** For cleaner assertions, use stretchr/testify (`require.NoError`, `assert.Equal`). See [EXAMPLES.md](EXAMPLES.md) for patterns and when to use `require` vs `assert`.
+
 ## Network Namespace Setup
 
 ### Creating Test Namespaces
