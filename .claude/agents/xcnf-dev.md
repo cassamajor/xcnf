@@ -25,6 +25,7 @@ Before starting any task, check if one of these skills applies:
 | **ebpf-cnf-scaffold** | Creating a new CNF project from scratch |
 | **ebpf-attach-hook** | Attaching eBPF programs to kernel hooks (XDP, tcx, netkit, kprobe) |
 | **ebpf-packet-parser** | Parsing packet headers (Ethernet, IPv4/IPv6, TCP/UDP, ICMP) |
+| **ebpf-packet-redirect** | Implementing packet redirection and routing (bpf_redirect_neigh, source-based routing) |
 | **ebpf-map-handler** | Creating maps and kernel-userspace communication |
 | **ebpf-test-harness** | Writing tests with namespaces, interfaces, traffic generation |
 | **cnf-networking** | Setting up network topology (netkit devices, tcx, routing) |

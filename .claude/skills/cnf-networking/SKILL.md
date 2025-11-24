@@ -546,3 +546,300 @@ bpftool net detach tcx dev eth0 ingress
                     │
                     └──> [Forward]
 ```
+
+## Source-Based Policy Routing with eBPF
+
+eBPF enables sophisticated routing decisions that go beyond traditional routing tables, solving problems like asymmetric routing and enabling dynamic network policies.
+
+### The Asymmetric Routing Problem
+
+**Common Scenario:**
+```
+Client (10.0.2.2)
+  ↓
+CNF Router (10.0.2.1 / 10.0.1.1)
+  ↓
+Server (10.0.1.2)
+  - Has default gateway: 192.168.0.1
+  - Has virtual IP: 192.168.100.5 on loopback
+```
+
+**The Issue:**
+1. Client sends packet to server's virtual IP (192.168.100.5)
+2. CNF forwards it correctly to server ✅
+3. Server receives packet, but routing table says "use default gateway"
+4. Reply goes to 192.168.0.1 instead of back through CNF ❌
+5. **Asymmetric routing breaks the connection**
+
+### eBPF Solution
+
+Instead of modifying routing tables, attach an eBPF program to the server's **egress** that redirects based on **source IP address**:
+
+**Key Components:**
+1. **Map-based policy**: Source IP → {interface, next_hop}
+2. **bpf_redirect_neigh**: Neighbor-aware packet redirection
+3. **Egress attachment**: Process outgoing packets
+
+**Simplified eBPF Program:**
+```c
+// Look up source IP in policy map
+struct route_policy *policy = bpf_map_lookup_elem(&policy_map, &src_ip);
+
+if (policy) {
+    // Redirect via specified interface/next-hop
+    struct bpf_redir_neigh nh = {
+        .nh_family = AF_INET,
+        .ipv4_nh = policy->next_hop,
+    };
+    return bpf_redirect_neigh(policy->interface_id, &nh, sizeof(nh), 0);
+}
+
+return TC_ACT_OK;  // No policy, use normal routing
+```
+
+### Integration with netkit and tcx
+
+**Attach to netkit device (egress side):**
+```go
+// Create netkit pair
+ip link add dev netkit0 type netkit mode l3 peer name netkit0-peer
+
+// Attach eBPF router to primary (server-facing) interface
+iface, _ := net.InterfaceByName("netkit0")
+link, err := link.AttachNetkit(link.NetkitOptions{
+    Program:   objs.PolicyRouter,
+    Interface: iface.Index,
+    Attach:    ebpf.AttachNetkitPrimary,
+})
+```
+
+**Attach using tcx (kernel 6.6+):**
+```go
+// Attach to egress for source-based routing
+iface, _ := net.InterfaceByName("eth0")
+link, err := link.AttachTCX(link.TCXOptions{
+    Program:   objs.PolicyRouter,
+    Attach:    ebpf.AttachTCXEgress,  // Important: egress!
+    Interface: iface.Index,
+})
+```
+
+### Use Cases for CNFs
+
+#### 1. Virtual IP / Anycast Handling
+
+Server has virtual IP on loopback, needs special routing for replies:
+
+```go
+// Policy: Packets FROM virtual IP → route via specific interface
+addPolicy(map, RoutingPolicy{
+    SourceIP:  net.ParseIP("192.168.100.5"),
+    Interface: "eth1",
+    NextHop:   net.ParseIP("10.0.1.1"),
+})
+```
+
+#### 2. Multi-Homing / Multiple ISPs
+
+Route different customers through different ISPs:
+
+```go
+// Customer A → ISP 1
+addPolicy(map, RoutingPolicy{
+    SourceIP:  net.ParseIP("10.10.1.0"),  // Customer A subnet
+    Interface: "isp1",
+    NextHop:   net.ParseIP("203.0.113.1"),
+})
+
+// Customer B → ISP 2
+addPolicy(map, RoutingPolicy{
+    SourceIP:  net.ParseIP("10.10.2.0"),  // Customer B subnet
+    Interface: "isp2",
+    NextHop:   net.ParseIP("198.51.100.1"),
+})
+```
+
+#### 3. Service Mesh Sidecar Routing
+
+Pod with multiple interfaces, route based on source IP:
+
+```go
+// Service traffic → service network
+addPolicy(map, RoutingPolicy{
+    SourceIP:  net.ParseIP("10.96.0.10"),  // Service IP
+    Interface: "net1",
+    NextHop:   net.ParseIP("10.96.0.1"),
+})
+
+// Management traffic → management network
+addPolicy(map, RoutingPolicy{
+    SourceIP:  net.ParseIP("192.168.1.10"),  // Management IP
+    Interface: "net0",
+    NextHop:   net.ParseIP("192.168.1.1"),
+})
+```
+
+#### 4. VPN / Tunnel Endpoint
+
+Traffic from tunnel IPs → tunnel interface:
+
+```go
+addPolicy(map, RoutingPolicy{
+    SourceIP:  net.ParseIP("172.16.0.0"),  // VPN subnet
+    Interface: "tun0",
+    NextHop:   net.ParseIP("172.16.0.1"),
+})
+```
+
+### Complete Example: CNF Router with Source-Based Routing
+
+**Network Setup:**
+```bash
+# Create netkit pair between namespaces
+ip netns add client
+ip netns add server
+
+ip link add dev veth0 type netkit mode l3 peer name veth0-peer peer_mode l3
+ip link set veth0-peer netns client
+ip link set veth1-peer netns server
+
+# Configure server
+ip netns exec server ip addr add 192.168.100.5/32 dev lo
+ip netns exec server ip addr add 10.0.1.2/24 dev veth1-peer
+ip netns exec server ip link set veth1-peer up
+
+# Configure host (CNF router)
+ip addr add 10.0.1.1/24 dev veth0
+ip addr add 10.0.2.1/24 dev veth1
+ip link set veth0 up
+ip link set veth1 up
+
+sysctl -w net.ipv4.ip_forward=1
+```
+
+**CNF Application:**
+```go
+package main
+
+import (
+    "log"
+    "net"
+
+    "github.com/cilium/ebpf/link"
+)
+
+func main() {
+    // Load eBPF program with routing policies
+    spec, _ := LoadPolicyRouter()
+    objs := &PolicyRouterObjects{}
+    spec.LoadAndAssign(objs, nil)
+    defer objs.Close()
+
+    // Attach to server-facing interface (egress)
+    iface, _ := net.InterfaceByName("veth0")
+    l, err := link.AttachTCX(link.TCXOptions{
+        Program:   objs.PolicyRouter,
+        Attach:    ebpf.AttachTCXEgress,
+        Interface: iface.Index,
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer l.Close()
+
+    // Configure policy: virtual IP traffic via veth1
+    addPolicy(objs.PolicyRoutesV4, RoutingPolicy{
+        SourceIP:  net.ParseIP("192.168.100.5"),
+        Interface: "veth1",
+        NextHop:   net.ParseIP("10.0.2.1"),
+    })
+
+    log.Println("CNF router running with source-based routing...")
+
+    // Wait for signal...
+}
+```
+
+### Why This Matters for Cloud Native
+
+**Traditional Solutions:**
+- Require modifying routing tables on every host
+- Need root access to change routing
+- Complex iproute2 rules and policy routing
+- Difficult to manage at scale
+
+**eBPF CNF Solution:**
+- ✅ Per-packet programmable routing
+- ✅ No system routing table changes
+- ✅ Dynamic policy updates (just update map)
+- ✅ Works in containers without privilege escalation
+- ✅ Can override normal routing completely
+- ✅ Integrates with netkit/tcx for modern networking
+
+### Advanced Patterns
+
+**Load Balancing:**
+```c
+// Round-robin or hash-based backend selection
+__u32 backend_idx = bpf_get_prandom_u32() % num_backends;
+struct backend *backend = bpf_map_lookup_elem(&backends, &backend_idx);
+```
+
+**Conditional Routing:**
+```c
+// Route based on source IP + destination port
+struct policy_key {
+    __u32 src_ip;
+    __u16 dst_port;
+    __u8 protocol;
+};
+```
+
+**Policy Chaining:**
+```c
+// Try source-based, fall back to destination-based, then default
+policy = src_policy ?? dst_policy ?? default_policy;
+```
+
+### Testing Source-Based Routing
+
+**Setup Test:**
+```bash
+# Terminal 1: Start CNF router
+go run .
+
+# Terminal 2: Test from client namespace
+ip netns exec client nc 192.168.100.5 8080
+```
+
+**Verify with tcpdump:**
+```bash
+# Watch traffic on CNF interfaces
+tcpdump -i veth0 -n icmp or tcp port 8080
+tcpdump -i veth1 -n icmp or tcp port 8080
+```
+
+**Check eBPF stats:**
+```bash
+bpftool map dump name policy_routes_v4
+bpftool map dump name stats
+```
+
+### Best Practices
+
+1. **Attach to egress** for source-based routing (not ingress)
+2. **Use network byte order** for IP addresses in maps
+3. **Validate policies** before inserting (check interface exists)
+4. **Monitor statistics** to verify policies are being applied
+5. **Use netkit or tcx** for better eBPF integration
+6. **Test both directions** (client→server and server→client)
+7. **Handle policy lookup failures** gracefully (fall back to normal routing)
+8. **Log policy changes** for debugging
+9. **Consider IPv6** if running dual-stack
+10. **Document routing policies** in configuration management
+
+### Further Reading
+
+- See **ebpf-packet-redirect** skill for detailed redirection patterns
+- See **ebpf-map-handler** skill for policy map management
+- See **ebpf-test-harness** skill for multi-container testing scenarios

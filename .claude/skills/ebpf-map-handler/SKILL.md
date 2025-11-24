@@ -593,6 +593,313 @@ func main() {
 }
 ```
 
+## Map-Based Policy Configuration
+
+Maps are ideal for implementing dynamic routing policies, firewall rules, and other configuration that needs to be updated from userspace without reloading the eBPF program.
+
+### Use Case: Source-Based Routing Policy
+
+**Scenario:** Route packets to different next-hops based on their source IP address.
+
+### C Map Definition
+
+```c
+// Routing policy record
+struct route_policy {
+    __u32 interface_id;  // Output interface index
+    __u32 next_hop;      // Next hop IP address (network byte order)
+};
+
+// Map: Source IP → Routing Policy
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __u32);   // Source IPv4 address
+    __type(value, struct route_policy);
+    __uint(max_entries, 1024);
+} policy_routes SEC(".maps");
+
+// eBPF program that uses the policy map
+SEC("tc")
+int apply_routing_policy(struct __sk_buff *skb) {
+    // ... parse packet to get source IP ...
+    __u32 src_ip = iph->saddr;
+
+    // Look up policy
+    struct route_policy *policy = bpf_map_lookup_elem(&policy_routes, &src_ip);
+    if (!policy)
+        return TC_ACT_OK;  // No policy, use normal routing
+
+    // Apply policy (see ebpf-packet-redirect skill)
+    struct bpf_redir_neigh nh = {
+        .nh_family = AF_INET,
+        .ipv4_nh = policy->next_hop,
+    };
+
+    return bpf_redirect_neigh(policy->interface_id, &nh, sizeof(nh), 0);
+}
+```
+
+### Go Policy Management
+
+```go
+package main
+
+import (
+    "encoding/binary"
+    "fmt"
+    "net"
+
+    "github.com/cilium/ebpf"
+)
+
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -type route_policy PolicyRouter router.c
+
+type RoutingPolicy struct {
+    SourceIP  net.IP
+    Interface string
+    NextHop   net.IP
+}
+
+// Add routing policy to map
+func addRoutingPolicy(m *ebpf.Map, policy RoutingPolicy) error {
+    // Get interface index
+    iface, err := net.InterfaceByName(policy.Interface)
+    if err != nil {
+        return fmt.Errorf("interface not found: %w", err)
+    }
+
+    // Convert source IP to map key (network byte order)
+    srcIP := policy.SourceIP.To4()
+    if srcIP == nil {
+        return fmt.Errorf("invalid IPv4 address: %s", policy.SourceIP)
+    }
+    key := binary.BigEndian.Uint32(srcIP)
+
+    // Convert next hop to network byte order
+    nextHopIP := policy.NextHop.To4()
+    if nextHopIP == nil {
+        return fmt.Errorf("invalid next hop: %s", policy.NextHop)
+    }
+    nextHop := binary.BigEndian.Uint32(nextHopIP)
+
+    // Create policy value
+    value := PolicyRouterRoutePolicy{
+        InterfaceId: uint32(iface.Index),
+        NextHop:     nextHop,
+    }
+
+    // Insert into map
+    if err := m.Put(&key, &value); err != nil {
+        return fmt.Errorf("failed to add policy: %w", err)
+    }
+
+    return nil
+}
+
+// Remove routing policy from map
+func removeRoutingPolicy(m *ebpf.Map, sourceIP net.IP) error {
+    srcIP := sourceIP.To4()
+    if srcIP == nil {
+        return fmt.Errorf("invalid IPv4 address: %s", sourceIP)
+    }
+    key := binary.BigEndian.Uint32(srcIP)
+
+    if err := m.Delete(&key); err != nil {
+        return fmt.Errorf("failed to remove policy: %w", err)
+    }
+
+    return nil
+}
+
+// List all routing policies
+func listRoutingPolicies(m *ebpf.Map) ([]RoutingPolicy, error) {
+    var (
+        key   uint32
+        value PolicyRouterRoutePolicy
+        policies []RoutingPolicy
+    )
+
+    iter := m.Iterate()
+    for iter.Next(&key, &value) {
+        // Convert key (uint32) back to IP
+        srcIP := make(net.IP, 4)
+        binary.BigEndian.PutUint32(srcIP, key)
+
+        // Convert next hop back to IP
+        nextHopIP := make(net.IP, 4)
+        binary.BigEndian.PutUint32(nextHopIP, value.NextHop)
+
+        // Get interface name
+        iface, err := net.InterfaceByIndex(int(value.InterfaceId))
+        if err != nil {
+            continue // Skip if interface no longer exists
+        }
+
+        policies = append(policies, RoutingPolicy{
+            SourceIP:  srcIP,
+            Interface: iface.Name,
+            NextHop:   nextHopIP,
+        })
+    }
+
+    if err := iter.Err(); err != nil {
+        return nil, fmt.Errorf("iteration error: %w", err)
+    }
+
+    return policies, nil
+}
+
+// Update policy (atomic replace)
+func updateRoutingPolicy(m *ebpf.Map, policy RoutingPolicy) error {
+    // Map updates are atomic, so just add with same key
+    return addRoutingPolicy(m, policy)
+}
+```
+
+### Usage Example
+
+```go
+func main() {
+    // Load eBPF program
+    spec, _ := LoadPolicyRouter()
+    objs := &PolicyRouterObjects{}
+    spec.LoadAndAssign(objs, nil)
+    defer objs.Close()
+
+    // Attach to interface...
+
+    // Configure routing policies
+    policies := []RoutingPolicy{
+        {
+            SourceIP:  net.ParseIP("192.168.100.5"),
+            Interface: "eth1",
+            NextHop:   net.ParseIP("10.0.1.1"),
+        },
+        {
+            SourceIP:  net.ParseIP("10.10.1.100"),
+            Interface: "eth2",
+            NextHop:   net.ParseIP("10.0.2.1"),
+        },
+    }
+
+    for _, policy := range policies {
+        if err := addRoutingPolicy(objs.PolicyRoutes, policy); err != nil {
+            log.Fatalf("adding policy: %v", err)
+        }
+        log.Printf("Added policy: %s via %s → %s",
+            policy.SourceIP, policy.Interface, policy.NextHop)
+    }
+
+    // Later: update a policy dynamically
+    updatePolicy := RoutingPolicy{
+        SourceIP:  net.ParseIP("192.168.100.5"),
+        Interface: "eth3",  // Changed interface
+        NextHop:   net.ParseIP("10.0.3.1"),
+    }
+    updateRoutingPolicy(objs.PolicyRoutes, updatePolicy)
+
+    // List all active policies
+    activePolicies, _ := listRoutingPolicies(objs.PolicyRoutes)
+    for _, p := range activePolicies {
+        log.Printf("Active: %s → %s via %s", p.SourceIP, p.NextHop, p.Interface)
+    }
+
+    // Remove a policy
+    removeRoutingPolicy(objs.PolicyRoutes, net.ParseIP("10.10.1.100"))
+}
+```
+
+### Dynamic Policy Updates
+
+One of the key advantages of map-based configuration is **dynamic updates without reloading**:
+
+```go
+// API endpoint to add routing policy
+func handleAddPolicy(w http.ResponseWriter, r *http.Request) {
+    var policy RoutingPolicy
+    json.NewDecoder(r.Body).Decode(&policy)
+
+    if err := addRoutingPolicy(policyMap, policy); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    w.WriteHeader(http.StatusCreated)
+}
+
+// Watch for configuration changes
+func watchConfigChanges(configFile string, policyMap *ebpf.Map) {
+    watcher, _ := fsnotify.NewWatcher()
+    watcher.Add(configFile)
+
+    for {
+        select {
+        case event := <-watcher.Events:
+            if event.Op&fsnotify.Write == fsnotify.Write {
+                // Reload and update policies
+                policies := loadPoliciesFromFile(configFile)
+                for _, p := range policies {
+                    updateRoutingPolicy(policyMap, p)
+                }
+            }
+        }
+    }
+}
+```
+
+### Other Policy Use Cases
+
+**1. Firewall Rules:**
+```go
+type FirewallRule struct {
+    SrcIP     net.IP
+    DstIP     net.IP
+    DstPort   uint16
+    Protocol  uint8
+    Action    uint8  // ALLOW or DROP
+}
+```
+
+**2. Rate Limiting:**
+```go
+type RateLimitPolicy struct {
+    SourceIP    net.IP
+    MaxRate     uint32  // Packets per second
+    BurstSize   uint32
+}
+```
+
+**3. QoS / Traffic Shaping:**
+```go
+type QoSPolicy struct {
+    FlowID      uint64
+    Priority    uint8
+    Bandwidth   uint32  // Kbps
+}
+```
+
+**4. NAT Configuration:**
+```go
+type NATPolicy struct {
+    InternalIP  net.IP
+    ExternalIP  net.IP
+    Port        uint16
+}
+```
+
+### Best Practices for Policy Maps
+
+1. **Use network byte order** for IP addresses in keys/values
+2. **Validate policies** before inserting into map
+3. **Check interface existence** before adding policies
+4. **Log policy changes** for auditing
+5. **Provide atomic updates** (update entire policy, not partial)
+6. **Implement list/get operations** for visibility
+7. **Handle map full errors** gracefully
+8. **Version your policy structures** for upgrades
+9. **Use LRU maps** if policies should auto-expire
+10. **Document policy semantics** clearly
+
 ## Best Practices
 
 1. **Match struct layout exactly** between C and Go (use `__attribute__((packed))`)

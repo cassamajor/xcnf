@@ -648,6 +648,430 @@ func TestCNFIntegration(t *testing.T) {
 }
 ```
 
+## Multi-Container Test Environments
+
+For more realistic testing scenarios, use Docker Compose to create multi-container topologies with the CNF acting as a router or gateway between containers.
+
+### Why Multi-Container Testing
+
+**Benefits:**
+- Tests real packet forwarding behavior
+- Validates routing and redirection logic
+- Simulates production network topologies
+- Tests asymmetric routing scenarios
+- Verifies end-to-end connectivity
+- Isolates test environment from host
+
+**Use Cases:**
+- CNF routers between networks
+- Service mesh sidecar testing
+- Load balancer validation
+- VPN/tunnel endpoint testing
+- Multi-homing scenarios
+
+### Example: 3-Tier Router Topology
+
+**Scenario:** Test a CNF router that solves asymmetric routing
+
+```
+Client (10.0.2.2)
+  ↓
+Router (10.0.2.1 / 10.0.1.1) [CNF with eBPF]
+  ↓
+Server (10.0.1.2)
+  - Virtual IP: 192.168.100.5 on lo
+  - Problem: Return traffic would go wrong way
+  - Solution: eBPF redirect based on source IP
+```
+
+### Docker Compose Setup
+
+**docker-compose.yml:**
+```yaml
+version: '3'
+
+services:
+  server:
+    image: ubuntu:22.04
+    privileged: true  # Required for eBPF
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    volumes:
+      - ./:/app
+    entrypoint: /app/scripts/server-entrypoint.sh
+    networks:
+      primary:
+        ipv4_address: 10.111.220.11
+      server_to_router:
+        ipv4_address: 10.111.221.11
+
+  router:
+    image: ubuntu:22.04
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - BPF
+    volumes:
+      - ./:/app
+      - /sys/kernel/debug:/sys/kernel/debug:rw
+    entrypoint: /app/scripts/router-entrypoint.sh
+    networks:
+      server_to_router:
+        ipv4_address: 10.111.221.21
+      router_to_client:
+        ipv4_address: 10.111.222.21
+    depends_on:
+      - server
+
+  client:
+    image: ubuntu:22.04
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./:/app
+    entrypoint: /app/scripts/client-entrypoint.sh
+    networks:
+      router_to_client:
+        ipv4_address: 10.111.222.22
+    depends_on:
+      - router
+
+networks:
+  primary:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.111.220.0/24
+  server_to_router:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.111.221.0/24
+  router_to_client:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.111.222.0/24
+```
+
+### Entrypoint Scripts
+
+**scripts/server-entrypoint.sh:**
+```bash
+#!/bin/bash
+set -e
+
+# Add virtual IP to loopback
+ip addr add 192.168.100.5/32 dev lo
+
+# Enable IP forwarding
+sysctl -w net.ipv4.ip_forward=1
+
+# Add route to reach client via router
+ip route add 10.111.222.0/24 via 10.111.221.21
+
+# Start listener
+echo "Server ready - listening on port 8080"
+nc -l -p 8080 -k &
+
+# Keep container running
+tail -f /dev/null
+```
+
+**scripts/router-entrypoint.sh:**
+```bash
+#!/bin/bash
+set -e
+
+# Enable IP forwarding
+sysctl -w net.ipv4.ip_forward=1
+
+# Add routes
+ip route add 192.168.100.0/24 via 10.111.221.11
+
+echo "Router ready - starting CNF..."
+
+# Build and run CNF with eBPF program
+cd /app
+go build -o cnf-router
+./cnf-router &
+
+# Keep container running
+tail -f /dev/null
+```
+
+**scripts/client-entrypoint.sh:**
+```bash
+#!/bin/bash
+set -e
+
+# Add route to server via router
+ip route add 192.168.100.0/24 via 10.111.222.21
+
+echo "Client ready"
+
+# Keep container running
+tail -f /dev/null
+```
+
+### Running Tests
+
+**Start environment:**
+```bash
+docker-compose up -d
+```
+
+**Test without eBPF (should fail):**
+```bash
+# From client container
+docker-compose exec client nc -v 192.168.100.5 8080
+# Expected: Connection timeout (asymmetric routing)
+```
+
+**Test with eBPF (should work):**
+```bash
+# Router is already running CNF with eBPF
+# From client container
+docker-compose exec client nc -v 192.168.100.5 8080
+# Expected: Connection successful
+```
+
+**Manual validation:**
+```bash
+# Check eBPF program loaded
+docker-compose exec router bpftool prog list
+
+# Check packet counters
+docker-compose exec router bpftool map dump name stats
+
+# View trace logs
+docker-compose exec router cat /sys/kernel/debug/tracing/trace_pipe
+```
+
+**Cleanup:**
+```bash
+docker-compose down -v
+```
+
+### Automated Test Integration
+
+**Go test that uses Docker Compose:**
+
+```go
+package main_test
+
+import (
+    "fmt"
+    "os"
+    "os/exec"
+    "testing"
+    "time"
+)
+
+func TestCNFRouterWithDockerCompose(t *testing.T) {
+    // Skip if Docker not available
+    if _, err := exec.LookPath("docker-compose"); err != nil {
+        t.Skip("docker-compose not available")
+    }
+
+    // Start containers
+    cmd := exec.Command("docker-compose", "up", "-d")
+    if err := cmd.Run(); err != nil {
+        t.Fatalf("starting containers: %v", err)
+    }
+
+    // Cleanup
+    defer func() {
+        exec.Command("docker-compose", "down", "-v").Run()
+    }()
+
+    // Wait for containers to be ready
+    time.Sleep(5 * time.Second)
+
+    // Test: ping from client to server's virtual IP
+    t.Run("ping_virtual_ip", func(t *testing.T) {
+        cmd := exec.Command("docker-compose", "exec", "-T", "client",
+            "ping", "-c", "3", "192.168.100.5")
+        output, err := cmd.CombinedOutput()
+
+        if err != nil {
+            t.Errorf("ping failed: %v\nOutput: %s", err, output)
+        }
+
+        t.Logf("Ping output:\n%s", output)
+    })
+
+    // Test: TCP connection from client to server
+    t.Run("tcp_connection", func(t *testing.T) {
+        // Start server listener
+        serverCmd := exec.Command("docker-compose", "exec", "-T", "server",
+            "sh", "-c", "echo 'hello' | nc -l -p 9000 &")
+        serverCmd.Run()
+
+        time.Sleep(1 * time.Second)
+
+        // Connect from client
+        clientCmd := exec.Command("docker-compose", "exec", "-T", "client",
+            "sh", "-c", "nc -w 2 192.168.100.5 9000")
+        output, err := clientCmd.CombinedOutput()
+
+        if err != nil {
+            t.Errorf("TCP connection failed: %v", err)
+        }
+
+        if string(output) != "hello\n" {
+            t.Errorf("unexpected response: got %q, want %q", output, "hello\n")
+        }
+    })
+
+    // Test: verify eBPF statistics
+    t.Run("ebpf_statistics", func(t *testing.T) {
+        cmd := exec.Command("docker-compose", "exec", "-T", "router",
+            "bpftool", "map", "dump", "name", "stats")
+        output, err := cmd.CombinedOutput()
+
+        if err != nil {
+            t.Logf("Warning: could not read stats: %v", err)
+            return  // Don't fail test
+        }
+
+        t.Logf("eBPF statistics:\n%s", output)
+
+        // Could parse output and check counters here
+    })
+}
+```
+
+### Alternative: Makefile-Based Testing
+
+**Makefile:**
+```makefile
+.PHONY: test-up test-validate test-down test-all
+
+test-up:
+	docker-compose up -d
+	@echo "Waiting for containers..."
+	@sleep 5
+
+test-validate: test-up
+	@echo "Testing connectivity..."
+	docker-compose exec -T client ping -c 3 192.168.100.5
+	docker-compose exec -T client nc -zv 192.168.100.5 8080
+
+test-down:
+	docker-compose down -v
+
+test-all: test-validate test-down
+```
+
+Usage:
+```bash
+make test-all
+```
+
+### Advanced Multi-Container Patterns
+
+#### Pattern 1: Chain of CNFs
+
+```yaml
+services:
+  cnf1:
+    # First CNF - packet classifier
+
+  cnf2:
+    # Second CNF - rate limiter
+    depends_on: [cnf1]
+
+  cnf3:
+    # Third CNF - load balancer
+    depends_on: [cnf2]
+```
+
+#### Pattern 2: Service Mesh Topology
+
+```yaml
+services:
+  app:
+    # Application container
+
+  sidecar:
+    # eBPF sidecar CNF
+    network_mode: "service:app"  # Share network namespace
+```
+
+#### Pattern 3: Multi-Path Testing
+
+```yaml
+services:
+  router:
+    networks:
+      - isp1
+      - isp2
+      - internal
+    # Test multiple paths/ISPs
+```
+
+### Debugging Multi-Container Tests
+
+**View logs:**
+```bash
+docker-compose logs -f router
+docker-compose logs -f server
+```
+
+**Enter container:**
+```bash
+docker-compose exec router /bin/bash
+```
+
+**Check routing:**
+```bash
+docker-compose exec router ip route
+docker-compose exec server ip route
+docker-compose exec client ip route
+```
+
+**Capture packets:**
+```bash
+docker-compose exec router tcpdump -i eth0 -n
+```
+
+**View eBPF programs:**
+```bash
+docker-compose exec router bpftool prog list
+docker-compose exec router bpftool map list
+```
+
+### Best Practices for Multi-Container Tests
+
+1. **Use specific container images** with version tags (not `latest`)
+2. **Set resource limits** to prevent test interference
+3. **Add health checks** to wait for readiness
+4. **Use named networks** for clarity
+5. **Volume mount your CNF binary** for faster iteration
+6. **Add cleanup in defer/trap** to avoid orphaned containers
+7. **Check prerequisites** (Docker, docker-compose) in test setup
+8. **Use meaningful container names** for debugging
+9. **Log extensively** during setup and validation
+10. **Test both success and failure** scenarios
+
+### Common Issues
+
+**Problem:** eBPF program won't load in container
+**Solution:** Ensure `privileged: true` and correct capabilities
+
+**Problem:** Asymmetric routing still occurs
+**Solution:** Verify CNF attached to correct interface and direction (egress)
+
+**Problem:** Containers can't resolve each other
+**Solution:** Use IP addresses or configure DNS in docker-compose
+
+**Problem:** tc/bpftool commands fail
+**Solution:** Mount `/sys/kernel/debug` and ensure BPF capability
+
 ## Benchmarking
 
 ```go
